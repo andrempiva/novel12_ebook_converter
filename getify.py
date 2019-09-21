@@ -8,6 +8,7 @@ import sys
 import traceback
 from subprocess import call
 import base64
+from html import escape
 
 from bs4 import BeautifulSoup
 import uuid
@@ -35,18 +36,22 @@ AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
 	"""Extract Text from Wuxiaworld html file and saves it into a seperate xhtml file"""
 
 
-def clean(file_name_in, file_name_out, start):
+def clean(file_name_in, file_name_out, chapter_title):
 	has_spoiler = None
 	raw = open(file_name_in, "r", encoding="utf8")
-	soup = BeautifulSoup(raw, 'lxml')
-	chapter_title = soup.find(class_="caption clearfix")
-	chapter_title = chapter_title.find("h4")
-	chapter_title = chapter_title.text
-	soups = soup.find_all(class_="fr-view")
-	for block in soups:
-		if not block.has_attr('id'):
-			soup = block
-			break
+	# raw = open('test.html', "r", encoding="utf8")
+	soup = BeautifulSoup(raw, 'lxml').find(class_="content-center").p
+	# chapter_title = soup.find(class_="content-center").p
+	contents = soup.contents
+	# chapter_title = contents[0].replace('\n\t','') + ' - ' + contents[4].replace('\n\t','')
+	# chapter_title = soup.find(class_="caption clearfix")
+	# chapter_title = chapter_title.find("h4")
+	# chapter_title = chapter_title.text
+	# soups = soup.find_all(class_="fr-view")
+	# for block in soups:
+	# 	if not block.has_attr('id'):
+	# 		soup = block
+	# 		break
 	for a in soup.find_all("a"):
 		a.decompose()
 	raw.close()
@@ -99,11 +104,13 @@ def cover_generator(src, novel, book_name, author):
 	if os.name == 'nt':
 		storage_dir = os.path.expanduser("~") + os.sep + "wuxiaworld_export_ebook"
 	if os.path.isdir(storage_dir + os.sep + "tmp") is False:
-		os.mkdirs(storage_dir + os.sep + "tmp")
-		
-	urllib.request.urlretrieve(src, storage_dir + os.sep + "tmp" + os.sep + "origin_cover")
-	
-	file1 = open(storage_dir + os.sep + "tmp" + os.sep + "origin_cover", "rb")
+		os.makedirs(storage_dir + os.sep + "tmp")
+
+	# urllib.request.urlretrieve(src, storage_dir + os.sep + "tmp" + os.sep + "origin_cover")
+	urllib.request.urlretrieve(src, storage_dir + os.sep + "tmp" + os.sep + "cover.png")
+
+	# file1 = open(storage_dir + os.sep + "tmp" + os.sep + "origin_cover", "rb")
+	file1 = open(storage_dir + os.sep + "tmp" + os.sep + "cover.png", "rb")
 	file2 = open(current_dir + os.sep + "ressources" + os.sep + "jacket.xhtml", "rb")
 	file3 = open(storage_dir + os.sep + "tmp" + os.sep + "jacket.xhtml", "wb")
 	cov = file1.read()
@@ -121,20 +128,20 @@ def cover_generator(src, novel, book_name, author):
 	jacket = jacket.replace('{title}', book_name)
 	jacket = jacket.replace('{author}', author)
 	jacket = jacket.replace('{COVER}', ext+covi)
-	file3.write(jacket.encode('utf-8')) 
+	file3.write(jacket.encode('utf-8'))
 	file3.close()
-		
-	try:
-		call([
-				sys.executable,
-				current_dir + os.sep + "cover_generator" + os.sep + "exec.py",
-				"-o",
-				storage_dir + os.sep + "tmp" + os.sep + "cover.png",
-				storage_dir + os.sep + "tmp" + os.sep + "jacket.xhtml"
-			])
-	except RuntimeError as e:
-		traceback.print_exc()
-		
+
+	# try:
+	# 	call([
+	# 			sys.executable,
+	# 			current_dir + os.sep + "cover_generator" + os.sep + "exec.py",
+	# 			"-o",
+	# 			storage_dir + os.sep + "tmp" + os.sep + "cover.png",
+	# 			storage_dir + os.sep + "tmp" + os.sep + "jacket.xhtml"
+	# 		])
+	# except RuntimeError as e:
+	# 	traceback.print_exc()
+
 	# os.remove(storage_dir + os.sep + "tmp" + os.sep + "origin_cover.jpg")
 	# os.remove(storage_dir + os.sep + "tmp" + os.sep + "jacket.xhtml")
 
@@ -218,11 +225,11 @@ def generate(html_files, novelname, author, chaptername, book, chapter_s, chapte
 	manifest = ""
 	spine = ""
 	metadata = '''<dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">%(novelname)s</dc:title>
-		<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns0="http://www.idpf.org/2007/opf" ns0:role="aut" 
+		<dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns0="http://www.idpf.org/2007/opf" ns0:role="aut"
 			ns0:file-as="Unbekannt">%(author)s</dc:creator>
 		<dc:language xmlns:dc="http://purl.org/dc/elements/1.1/">en</dc:language>
 		<dc:identifier xmlns:dc="http://purl.org/dc/elements/1.1/">%(uuid)s"</dc:identifier>''' % {
-		"novelname": file_name, "author": author, "uuid": uniqueid}
+		"novelname": escape(file_name), "author": escape(author), "uuid": uniqueid}
 	toc_manifest = '<item href="toc.xhtml" id="toc" properties="nav" media-type="application/xhtml+xml"/>'
 
 	# Write each HTML file to the ebook, collect information for the index
@@ -240,19 +247,19 @@ def generate(html_files, novelname, author, chaptername, book, chapter_s, chapte
 		})
 
 	epub.writestr("OEBPS/toc.xhtml", generate_toc(html_files, novelname))
-	
+
 	epub.write(storage_dir + os.sep + "tmp/cover.png", "OEBPS/cover.png")
 	try: os.remove(storage_dir + os.sep + "tmp/cover.png")
 	except: {}
-	
+
 	file2 = open("./ressources/common.css", "r")
 	file3 = open(storage_dir + os.sep + "tmp/common.css", "w")
 	ccss = file2.read()
 	file2.close()
 	ccss = ccss.replace('<FONT>', font)
-	file3.write(ccss) 
+	file3.write(ccss)
 	file3.close()
-	
+
 	epub.write(storage_dir + os.sep + "tmp/common.css", "OEBPS/common.css")
 	try: os.remove(storage_dir + os.sep + "tmp/common.css")
 	except: {}
@@ -260,7 +267,7 @@ def generate(html_files, novelname, author, chaptername, book, chapter_s, chapte
 	epub.write("./ressources/fonts/"+font+"/Bold.ttf", "OEBPS/Bold.ttf")
 	epub.write("./ressources/fonts/"+font+"/Bold-Italic.ttf", "OEBPS/Bold-Italic.ttf")
 	epub.write("./ressources/fonts/"+font+"/Italic.ttf", "OEBPS/Italic.ttf")
-	
+
 	epub.close()
 
 	# removes all the temporary files
@@ -269,7 +276,7 @@ def generate(html_files, novelname, author, chaptername, book, chapter_s, chapte
 		except: {}
 
 
-def generate_toc(html_files, novel):
+def generate_toc(html_files, novelname):
 	# Generates a Table of Contents + lost strings
 	toc_start = '''<?xml version='1.0' encoding='utf-8'?>
 		<!DOCTYPE html>
@@ -301,5 +308,5 @@ def generate_toc(html_files, novel):
 		toc_mid += '''<li class="toc-Chapter-rw" id="num_%s">
 			<a href="%s">%s</a>
 			</li>''' % (i, os.path.basename(html_files[i]), chapter)
-			
-	return toc_start % {"novelname": novel, "toc_mid": toc_mid, "toc_end": toc_end}
+
+	return toc_start % {"novelname": escape(novelname), "toc_mid": toc_mid, "toc_end": toc_end}
